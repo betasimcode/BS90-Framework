@@ -32,7 +32,9 @@ BS90.Sectors.State = {
 
     // Eventos
     newLap: false,
-    splitCrossed: false,
+    
+	splitCrossed: false,
+	
 	freeze: false,
 
 	freezeUntil: 0,
@@ -149,8 +151,8 @@ BS90.Sectors.Update = function ()
     if (newLap)
     {
 		//--------------------------------------------------
-// Finalizar el último sector de la vuelta
-//--------------------------------------------------
+		// Finalizar el último sector de la vuelta
+		//--------------------------------------------------
 
 		BS90.Sectors.State.currentSectorTime =
 			sessionTime -
@@ -334,6 +336,29 @@ BS90.Sectors.Debug = function ()
 BS90.Sectors.AccumulatedTime = function ()
 {
     BS90.Sectors.Update();
+
+    const sessionTime =
+        Number(
+            $prop("DataCorePlugin.GameRawData.Telemetry.SessionTime")
+        );
+
+    //------------------------------------------------------
+    // Congelar último acumulado tras meta
+    //------------------------------------------------------
+
+    if (
+        BS90.Sectors.State.freeze &&
+        sessionTime < BS90.Sectors.State.freezeUntil
+    )
+    {
+        return BS90.Sectors.State.freezeAccumulated;
+    }
+
+    //------------------------------------------------------
+    // Fin del freeze
+    //------------------------------------------------------
+
+    BS90.Sectors.State.freeze = false;
 
     return BS90.Sectors.State.accumulatedSectorTime;
 };

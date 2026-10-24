@@ -1,12 +1,27 @@
 //----------------------------------------------------------
-// BetaSimCode SHD
+// BetaSimCode SHD 2510260156
 // BS90.Relative
 //----------------------------------------------------------
-
 if (!globalThis.BS90)
     globalThis.BS90 = {};
 
 BS90.Relative = BS90.Relative || {};
+//----------------------------------------------------------
+//
+// BS90.Relative
+//
+// Public API
+//
+// PlayerInfo()
+//
+// TrackAheadInfo()
+//
+// TrackBehindInfo()
+//
+// Cars() (advanced)
+//
+//----------------------------------------------------------
+
 
 //----------------------------------------------------------
 // Estado
@@ -35,6 +50,10 @@ BS90.Relative.State = {
 	trackAhead: null,
 
 	trackBehind: null,
+	
+	trackAheadDelta: Number.MAX_VALUE,
+
+	trackBehindDelta: -Number.MAX_VALUE,
 
 };
 
@@ -54,14 +73,27 @@ BS90.Relative.Update = function ()
         Number($prop("DataCorePlugin.GameRawData.Telemetry.PlayerCarClassPosition"));
 		
 			
-			BS90.Relative.BuildCars();
-		
+	BS90.Relative.BuildCars();
+	
+	BS90.Relative.FindTrackRelative();
+
 };
 
 //----------------------------------------------------------
 // Construye lista de coches
 //----------------------------------------------------------
-
+//----------------------------------------------------------
+// TODO(PR#3)
+//
+// Extraer:
+//
+// • FindRelativeRace()
+// • SortCars()
+// • FindPlayer()
+//
+// BuildCars() sólo debe construir los coches.
+//
+//----------------------------------------------------------
 BS90.Relative.BuildCars = function ()
 {
     BS90.Relative.State.cars = [];
@@ -80,6 +112,9 @@ BS90.Relative.BuildCars = function ()
 
     const estTime =
         $prop("DataCorePlugin.GameRawData.Telemetry.CarIdxEstTime");
+		
+	const lastLapTime =
+		$prop("DataCorePlugin.GameRawData.Telemetry.CarIdxLastLapTime");
 
     for (let carIdx = 0; carIdx < lapCompleted.length; carIdx++)
     {
@@ -106,6 +141,9 @@ BS90.Relative.BuildCars = function ()
 
 			trackPosition:
 				lapDistPct[carIdx],
+			
+			lastLapTime:
+				lastLapTime[carIdx],
 
             position: position[carIdx],
 
@@ -153,6 +191,8 @@ BS90.Relative.BuildCars = function ()
 	BS90.Relative.State.playerIndex =
     playerIndex;
 	
+	// TODO(PR#1): Extraer este bloque a FindRelativeRace() en el siguiente commit.
+
 	//------------------------------------------------------
 	// Distancia relativa al jugador
 	//------------------------------------------------------
@@ -184,30 +224,20 @@ BS90.Relative.BuildCars = function ()
 		{
 			if (car.isPlayer)
 				continue;
+            const delta =
+                BS90.Relative.Delta(
+                    car,
+                    player,
+                    "race"
+                );
 
-			const lapDelta =
-				car.lapCompleted -
-				player.lapCompleted;
+            car.deltaTrackPosition = delta;
 
-			const pctDelta =
-				car.lapDistPct -
-				player.lapDistPct;
-
-			const delta =
-				BS90.Relative.Delta(
+			car.trackGap =
+				BS90.Relative.TrackGap(
 					car,
-					player,
-					"race"
+					player
 				);
-
-			const delta =
-				BS90.Relative.Delta(
-					car,
-					player,
-					"track"
-				);
-
-			car.deltaTrackPosition = delta;
 
 			//--------------------------------------------------
 			// Coche delante más cercano
@@ -242,7 +272,8 @@ BS90.Relative.BuildCars = function ()
 	
 	
 };
-
+/////////////////////////////////// end BuildCars /////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////
 
 
 //----------------------------------------------------------
@@ -256,6 +287,8 @@ BS90.Relative.PlayerCarIdx = function ()
     return BS90.Relative.State.playerCarIdx;
 };
 
+// TODO(PR#2):
+// Sustituir por PlayerInfo()
 BS90.Relative.PlayerPosition = function ()
 {
     BS90.Relative.Update();
@@ -275,13 +308,13 @@ BS90.Relative.PlayerClassPosition = function ()
 // Posición de un CarIdx
 //----------------------------------------------------------
 
-BS90.Relative.CarPosition = function (carIdx)
-{
-    const positions =
-        $prop("DataCorePlugin.GameRawData.Telemetry.CarIdxPosition");
+// BS90.Relative.CarPosition = function (carIdx)
+// {
+    // const positions =
+        // $prop("DataCorePlugin.GameRawData.Telemetry.CarIdxPosition");
 
-    return positions[carIdx];
-};
+    // return positions[carIdx];
+// };
 
 //----------------------------------------------------------
 // DriverInfo por CarIdx
@@ -323,20 +356,10 @@ BS90.Relative.DriverInfo = function (carIdx)
     return null;
 };
 
-//----------------------------------------------------------
-// Debug posición de un CarIdx
-//----------------------------------------------------------
 
-BS90.Relative.DebugPosition = function (carIdx)
-{
-    const positions =
-        $prop("DataCorePlugin.GameRawData.Telemetry.CarIdxPosition");
-
-    return positions[carIdx];
-};
 
 //----------------------------------------------------------
-// Lista de coches
+// Car list
 //----------------------------------------------------------
 
 BS90.Relative.Cars = function ()
@@ -347,15 +370,19 @@ BS90.Relative.Cars = function ()
 };
 
 //----------------------------------------------------------
-// Coche del jugador
+// Driver info
 //----------------------------------------------------------
 
-BS90.Relative.Player = function ()
+BS90.Relative.PlayerInfo = function ()
 {
     BS90.Relative.Update();
 
-    return BS90.Relative.State.cars.find(
-        c => c.isPlayer
+    return BS90.Relative.CarInfo(
+
+        BS90.Relative.State.cars[
+            BS90.Relative.State.playerIndex
+        ]
+
     );
 };
 
@@ -392,10 +419,12 @@ BS90.Relative.CarAt = function (offset)
     return BS90.Relative.State.cars[index];
 };
 
+/////////////////////////////////////////////////////////////////////////////////////////////////
 //----------------------------------------------------------
-// Coche delante
+// Car Ahead
 //----------------------------------------------------------
-
+// TODO(PR#2):
+// Renombrar a RaceAheadCar()
 BS90.Relative.Ahead = function ()
 {
     return BS90.Relative.CarAt(-1);
@@ -403,71 +432,15 @@ BS90.Relative.Ahead = function ()
 
 
 //----------------------------------------------------------
-// Coche detrás
+// Car Behind
 //----------------------------------------------------------
-
+// TODO(PR#2):
+// Renombrar a RaceAheadCar()
 BS90.Relative.Behind = function ()
 {
     return BS90.Relative.CarAt(+1);
 };
-
-
-/////////////////////////////////////////////////////
-
-BS90.Relative.NewAhead = function ()
-{
-    BS90.Relative.Update();
-
-    return BS90.Relative.State.ahead;
-};
-
-BS90.Relative.NewBehind = function ()
-{
-    BS90.Relative.Update();
-
-    return BS90.Relative.State.behind;
-};
-
-
-
-BS90.Relative.DebugRelative = function ()
-{
-    BS90.Relative.Update();
-
-    return BS90.Relative.State.cars
-        .map(c =>
-            (c.isPlayer ? ">> " : "   ") +
-            c.userName +
-            " : " +
-            c.deltaTrackPosition.toFixed(3)
-        )
-        .join("\n");
-};
-
-BS90.Relative.DebugEstTime = function ()
-{
-    BS90.Relative.Update();
-
-    return BS90.Relative.State.cars
-        .map(c =>
-            c.userName +
-            " : " +
-            c.estTime
-        )
-        .join("\n");
-};
-
-//----------------------------------------------------------
-// Coordenada utilizada por el Relative
-//----------------------------------------------------------
-
-BS90.Relative.Coordinate = function(car, mode)
-{
-    if (mode == "race")
-        return car.racePosition;
-
-    return car.trackPosition;
-};
+/////////////////////////////////////////////////////////////////////////////////////////////////
 
 //----------------------------------------------------------
 // Calcula delta entre dos coches
@@ -513,16 +486,391 @@ BS90.Relative.Delta = function (car, player, mode)
     return 0;
 };
 
-BS90.Relative.TrackAhead = function ()
-{
-    BS90.Relative.Update();
 
-    return BS90.Relative.State.trackAhead;
+
+BS90.Relative.TrackGap = function (car, player)
+{
+    //------------------------------------------------------
+    // Sin vuelta válida
+    //------------------------------------------------------
+
+    if (
+        car.lastLapTime <= 0 ||
+        player.lastLapTime <= 0
+    )
+        return null;
+
+    //------------------------------------------------------
+    // Delta físico sobre la pista
+    //------------------------------------------------------
+
+    let delta =
+        car.lapDistPct -
+        player.lapDistPct;
+
+    //------------------------------------------------------
+    // Corrección circular
+    //------------------------------------------------------
+
+    if (delta > 0.5)
+        delta -= 1;
+
+    if (delta < -0.5)
+        delta += 1;
+
+    //------------------------------------------------------
+    // Tiempo de vuelta de referencia
+    //------------------------------------------------------
+
+    const referenceLapTime =
+        (
+            car.lastLapTime +
+            player.lastLapTime
+        ) / 2;
+
+    //------------------------------------------------------
+    // Gap estimado
+    //------------------------------------------------------
+
+    return delta * referenceLapTime;
 };
 
-BS90.Relative.TrackBehind = function ()
+BS90.Relative.FindTrackRelative = function ()
+{
+    //------------------------------------------------------
+    // Reset
+    //------------------------------------------------------
+
+    BS90.Relative.State.trackAhead = null;
+    BS90.Relative.State.trackBehind = null;
+
+    BS90.Relative.State.trackAheadDelta = Number.MAX_VALUE;
+    BS90.Relative.State.trackBehindDelta = -Number.MAX_VALUE;
+
+    //------------------------------------------------------
+    // Player
+    //------------------------------------------------------
+
+    const player =
+		BS90.Relative.State.cars[
+			BS90.Relative.State.playerIndex
+		];
+
+    if (!player)
+        return;
+
+    //------------------------------------------------------
+    // Buscar coches
+    //------------------------------------------------------
+
+    for (const car of BS90.Relative.State.cars)
+    {
+        if (car.isPlayer)
+            continue;
+
+        //--------------------------------------------------
+        // Delta físico
+        //--------------------------------------------------
+
+        let delta =
+            car.lapDistPct -
+            player.lapDistPct;
+
+        //--------------------------------------------------
+        // Corrección circular
+        //--------------------------------------------------
+
+        if (delta > 0.5)
+            delta -= 1;
+
+        if (delta < -0.5)
+            delta += 1;
+
+        //--------------------------------------------------
+        // Guardamos para debug
+        //--------------------------------------------------
+
+        car.trackDelta = delta;
+
+        //--------------------------------------------------
+        // Gap
+        //--------------------------------------------------
+
+        car.trackGap =
+            BS90.Relative.TrackGap(
+                car,
+                player
+            );
+
+        //--------------------------------------------------
+        // Ahead
+        //--------------------------------------------------
+
+        if (
+            delta > 0 &&
+            delta < BS90.Relative.State.trackAheadDelta
+        )
+        {
+            BS90.Relative.State.trackAhead = car;
+            BS90.Relative.State.trackAheadDelta = delta;
+        }
+
+        //--------------------------------------------------
+        // Behind
+        //--------------------------------------------------
+
+        if (
+            delta < 0 &&
+            delta > BS90.Relative.State.trackBehindDelta
+        )
+        {
+            BS90.Relative.State.trackBehind = car;
+            BS90.Relative.State.trackBehindDelta = delta;
+        }
+    }
+}
+
+
+
+
+
+
+//----------------------------------------------------------
+// Formatea un gap
+//----------------------------------------------------------
+
+BS90.Relative.FormatGap = function (gap)
+{
+    if (gap == null)
+        return "-";
+
+    if (gap > 0)
+        return "+" + gap.toFixed(1);
+
+    return gap.toFixed(1);
+};
+
+//----------------------------------------------------------
+// Convierte un coche interno en información pública
+//----------------------------------------------------------
+
+BS90.Relative.CarInfo = function (car)
+{
+    //------------------------------------------------------
+    // Sin coche
+    //------------------------------------------------------
+
+    if (!car)
+    {
+        return {
+
+            //--------------------------------------------------
+            // Posición
+            //--------------------------------------------------
+
+            racePosition: null,
+
+            classPosition: null,
+
+            //--------------------------------------------------
+            // Piloto
+            //--------------------------------------------------
+
+            driverName: "",
+
+            displayName: "",
+
+            driverInitials: "",
+
+            carNumber: "",
+
+            //--------------------------------------------------
+            // Relative
+            //--------------------------------------------------
+
+            gapSeconds: null,
+
+            gapText: "-"
+
+        };
+    }
+
+    //------------------------------------------------------
+    // Información
+    //------------------------------------------------------
+
+    return {
+
+        //--------------------------------------------------
+        // Posición
+        //--------------------------------------------------
+
+        racePosition: 
+          "P " + car.position,
+
+        classPosition:
+            car.classPosition,
+
+        //--------------------------------------------------
+        // Piloto
+        //--------------------------------------------------
+
+        driverName:
+            car.userName,
+
+        displayName:
+            car.abbrevName,
+
+        driverInitials:
+            car.initials,
+
+        carNumber:
+            car.carNumber,
+
+        //--------------------------------------------------
+        // Relative
+        //--------------------------------------------------
+
+        gapSeconds:
+            car.trackGap,
+
+        gapText:
+            BS90.Relative.FormatGap(
+                car.trackGap
+            )
+			// distanceMeters:
+			// speedDifference:
+			// predictedGap:
+    };
+};
+
+//----------------------------------------------------------
+// Información del coche delante
+//----------------------------------------------------------
+
+BS90.Relative.TrackAheadInfo = function ()
 {
     BS90.Relative.Update();
 
-    return BS90.Relative.State.trackBehind;
+    return BS90.Relative.CarInfo(
+
+        BS90.Relative.State.trackAhead
+
+    );
+};
+
+
+//----------------------------------------------------------
+// Información del coche detrás
+//----------------------------------------------------------
+
+BS90.Relative.TrackBehindInfo = function ()
+{
+    BS90.Relative.Update();
+
+    return BS90.Relative.CarInfo(
+
+        BS90.Relative.State.trackBehind
+
+    );
+};
+
+///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
+//----------------------------------------------------------
+// Debug posición de un CarIdx
+//----------------------------------------------------------
+
+BS90.Relative.DebugPosition = function (carIdx)
+{
+    const positions =
+        $prop("DataCorePlugin.GameRawData.Telemetry.CarIdxPosition");
+
+    return positions[carIdx];
+};
+
+BS90.Relative.DebugRelative = function ()
+{
+    BS90.Relative.Update();
+
+    return BS90.Relative.State.cars
+        .map(c =>
+            (c.isPlayer ? ">> " : "   ") +
+            c.userName +
+            " : " +
+            c.deltaTrackPosition.toFixed(3)
+        )
+        .join("\n");
+};
+
+BS90.Relative.DebugEstTime = function ()
+{
+    BS90.Relative.Update();
+
+    return BS90.Relative.State.cars
+        .map(c =>
+            c.userName +
+            " : " +
+            c.estTime
+        )
+        .join("\n");
+};
+
+BS90.Relative.DebugTelemetry = function()
+{
+    return BS90.Relative.Cars()
+        .map(c =>
+            c.userName +
+            "\nRace : " + c.racePosition.toFixed(3) +
+            "\nTrack: " + c.trackPosition.toFixed(3) +
+            "\nEst  : " + c.estTime.toFixed(2) +
+            "\n"
+        )
+        .join("\n");
+}
+BS90.Relative.DebugLastLap = function ()
+{
+    const lastLap =
+        $prop("DataCorePlugin.GameRawData.Telemetry.CarIdxLastLapTime");
+
+    return BS90.Relative.Cars()
+        .map(c =>
+            c.userName +
+            " : " +
+            lastLap[c.carIdx]
+        )
+        .join("\n");
+};
+
+BS90.Relative.DebugGap = function ()
+{
+    BS90.Relative.Update();
+
+    const player =
+		BS90.Relative.State.cars[
+			BS90.Relative.State.playerIndex
+		];
+
+    return BS90.Relative.State.cars
+        .map(c =>
+        {
+            const gap =
+                BS90.Relative.TrackGap(
+                    c,
+                    player
+                );
+
+            return (
+                (c.isPlayer ? ">> " : "   ") +
+                c.userName +
+                " : " +
+                (
+                    gap == null
+                        ? "-"
+                        : gap.toFixed(2) + " s"
+                )
+            );
+        })
+        .join("\n");
 };

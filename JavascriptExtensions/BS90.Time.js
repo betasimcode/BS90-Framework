@@ -43,3 +43,207 @@ BS90.Time.Format = function(seconds)
         String(millis).padStart(3, "0")
     );
 };
+
+//--------------------------------------------------
+// Formato compacto Broadcast
+//--------------------------------------------------
+
+BS90.Time.Compact = function (value, decimals = 3)
+{
+    //--------------------------------------------------
+    // Sin datos
+    //--------------------------------------------------
+
+    if (value == null)
+    {
+        return "";
+    }
+
+    //--------------------------------------------------
+    // TimeSpan (.NET)
+    //--------------------------------------------------
+
+    if (typeof value === "object")
+    {
+        if (value.TotalSeconds != null)
+        {
+            value = value.TotalSeconds;
+        }
+        else
+        {
+            return "";
+        }
+    }
+
+    //--------------------------------------------------
+	// Número
+	//--------------------------------------------------
+
+	value = Number(value);
+
+	if (isNaN(value) || value < 0)
+	{
+		return "";
+	}
+
+	decimals = decimals ?? 3;
+
+    //--------------------------------------------------
+    // Menos de un minuto
+    //--------------------------------------------------
+
+    if (value < 60)
+	{
+		return value.toFixed(decimals);
+	}
+
+    //--------------------------------------------------
+    // Minutos
+    //--------------------------------------------------
+
+    const minutes = Math.floor(value / 60);
+
+    const seconds = value - (minutes * 60);
+
+    return (
+		minutes +
+		":" +
+		seconds
+			.toFixed(decimals)
+			.padStart(decimals + 3, "0")
+	);
+};
+
+//--------------------------------------------------
+// Formato cronómetro Broadcast (LIVE)
+//--------------------------------------------------
+
+BS90.Time.Live = function (value)
+{
+    //--------------------------------------------------
+    // Sin datos
+    //--------------------------------------------------
+
+    if (value == null)
+    {
+        return "";
+    }
+
+    //--------------------------------------------------
+    // TimeSpan (.NET)
+    //--------------------------------------------------
+
+    if (typeof value === "object")
+    {
+        if (value.TotalSeconds != null)
+        {
+            value = value.TotalSeconds;
+        }
+        else
+        {
+            return "";
+        }
+    }
+
+    //--------------------------------------------------
+    // Número
+    //--------------------------------------------------
+
+    value = Number(value);
+
+    if (isNaN(value) || value < 0)
+    {
+        return "";
+    }
+
+    //--------------------------------------------------
+    // Truncar a 1 decimal (NO redondear)
+    //--------------------------------------------------
+
+    value = Math.floor(value * 10) / 10;
+
+    //--------------------------------------------------
+    // Menos de un minuto
+    //--------------------------------------------------
+
+    if (value < 60)
+    {
+        return value.toFixed(1);
+    }
+
+    //--------------------------------------------------
+    // Minutos
+    //--------------------------------------------------
+
+    const minutes = Math.floor(value / 60);
+
+    const seconds = value - (minutes * 60);
+
+    return (
+        minutes +
+        ":" +
+        seconds.toFixed(1).padStart(4, "0")
+    );
+};
+
+BS90.Time.Seconds = function(value)
+{
+    if (value == null)
+    {
+        return null;
+    }
+
+    if (typeof value === "object")
+    {
+        if (value.TotalSeconds != null)
+        {
+            return value.TotalSeconds;
+        }
+
+        return null;
+    }
+
+    value = Number(value);
+
+    return isNaN(value) ? null : value;
+};
+
+//--------------------------------------------------
+// GAP
+//--------------------------------------------------
+
+BS90.Time.Gap = function (value)
+{
+    //--------------------------------------------------
+    // Sin datos
+    //--------------------------------------------------
+
+    if (value == null)
+    {
+        return "";
+    }
+
+    value = Number(value);
+
+    if (isNaN(value))
+    {
+        return "";
+    }
+
+    //--------------------------------------------------
+    // Signo
+    //--------------------------------------------------
+
+    if (value >= 0)
+	{
+		return "+" + value.toFixed(3);
+	}
+
+	return value.toFixed(3);
+
+    //--------------------------------------------------
+    // Formato
+    //--------------------------------------------------
+
+    return sign + value.toFixed(3);
+};

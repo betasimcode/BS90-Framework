@@ -46,9 +46,12 @@ All notable changes to this project will be documented in this file.
 
 - Initial `BS90.Delta` module on `feature/sector-deltas`.
 - Public accessors for sector delta and cumulative delta against `bestLap` and `FastestLap`.
-- Explicit `null` values where reference sector timing isn't available.
+- Conversion of SimHub `TimeSpan` values to seconds.
+- Reference properties mapped to `DataCorePlugin.GameData.SectorNBestLapTime` and `SectorNBestTime`.
 
 ### Notes
 
-- Sector-time reference property names must be validated in SimHub against the active iRacing data provider before relying on live values.
 - Positive delta means slower than reference; negative delta means faster.
+- `SectorNBestLapTime` provides sector splits from the best lap.
+- `SectorNBestTime` is the best individual sector time, so its cumulative sum is an optimal-sector reference, not necessarily the sector splits of one single session-fastest lap.
+- Live validation in SimHub is still required. The first delta value is available after the module has observed a sector transition.

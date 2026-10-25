@@ -164,7 +164,16 @@ BS90.Sectors.Update = function ()
 		BS90.Sectors.State.accumulatedSectorTime +=
 			BS90.Sectors.State.currentSectorTime;
 			
-		BS90.Lap.EndLap();
+		
+
+        // Register the final sector before closing the lap.
+        BS90.Lap.AddSector({
+            sector: BS90.Sectors.State.currentSector,
+            time: BS90.Sectors.State.lastSectorTime,
+            accumulated: BS90.Sectors.State.accumulatedSectorTime
+        });
+
+        BS90.Lap.EndLap();
 		
 		BS90.Sectors.History.sectors = [];
 		

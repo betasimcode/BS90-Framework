@@ -1,133 +1,72 @@
 //----------------------------------------------------------
 // BS90.Delta
-// Personal-best deltas using BS90.Sectors and BS90.Lap.
-// Units: seconds. Positive = slower, negative = faster.
-// Session-fastest deltas remain unavailable until actual sector
-// splits for the session's fastest lap are provided by a source.
+// Personal-best delta snapshots at completed sector splits.
+// Positive = slower; negative = faster. Display format: +/-0.0
 //----------------------------------------------------------
 
 (function (global)
 {
     "use strict";
-
     if (!global.BS90) global.BS90 = {};
     const BS90 = global.BS90;
     BS90.Delta = BS90.Delta || {};
 
+    const SPLIT_FREEZE_SECONDS = 3;
+    const FINISH_FREEZE_SECONDS = 8;
     const State = {
         initialized: false,
         seenLapNumber: null,
+        seenSectorCount: 0,
         bestLap: null,
         lastCompleted: null,
         status: "Waiting for telemetry",
         sector: null,
         bestSectorDelta: null,
-        bestCumulativeDelta: null
+        bestCumulativeDelta: null,
+        frozenUntil: 0,
+        frozenSector: null,
+        frozenCumulative: null
     };
 
-    function read(path)
-    {
-        try { return $prop(path); }
-        catch (error) { return null; }
+    function read(path) {
+        try { return $prop(path); } catch (error) { return null; }
     }
 
-    function number(value)
-    {
+    function number(value) {
         if (value === null || value === undefined || value === "") return null;
         const n = Number(value);
         return Number.isFinite(n) ? n : null;
     }
 
-    function validLap(lap)
-    {
-        if (!lap || !Array.isArray(lap.sectors) || lap.sectors.length === 0 ||
+    function validLap(lap) {
+        if (!lap || !Array.isArray(lap.sectors) || !lap.sectors.length ||
             !(number(lap.lapTime) > 0)) return false;
-
         let sum = 0;
-        for (let i = 0; i < lap.sectors.length; i++)
-        {
-            const sector = lap.sectors[i];
-            if (!sector || number(sector.sector) !== i + 1 ||
-                !(number(sector.time) > 0) ||
-                !(number(sector.accumulated) > 0)) return false;
-            sum += number(sector.time);
+        for (let i = 0; i < lap.sectors.length; i++) {
+            const item = lap.sectors[i];
+            if (!item || number(item.sector) !== i + 1 ||
+                !(number(item.time) > 0) || !(number(item.accumulated) > 0))
+                return false;
+            sum += number(item.time);
         }
         return Math.abs(sum - lap.lapTime) < 0.25;
     }
 
-    function cloneLap(lap)
-    {
+    function cloneLap(lap) {
         return {
             number: lap.number,
             lapTime: lap.lapTime,
-            sectors: lap.sectors.map(function (sector)
-            {
-                return {
-                    sector: sector.sector,
-                    time: sector.time,
-                    accumulated: sector.accumulated
-                };
+            sectors: lap.sectors.map(function (item) {
+                return { sector: item.sector, time: item.time, accumulated: item.accumulated };
             })
         };
     }
 
-    function captureCompletedLap()
-    {
-        const lapState = BS90.Lap && BS90.Lap.State;
-        if (!lapState || !lapState.current || !lapState.previous) return;
-
-        const currentNumber = number(lapState.current.number);
-        if (currentNumber === null) return;
-
-        if (State.seenLapNumber === null)
-        {
-            State.seenLapNumber = currentNumber;
-            return;
-        }
-        if (currentNumber === State.seenLapNumber) return;
-
-        State.seenLapNumber = currentNumber;
-        const completed = cloneLap(lapState.previous);
-
-        if (!validLap(completed))
-        {
-            State.lastCompleted = {
-                lapTime: completed.lapTime || null,
-                sectors: completed.sectors.length,
-                valid: false
-            };
-            return;
-        }
-
-        State.lastCompleted = {
-            lapTime: completed.lapTime,
-            sectors: completed.sectors.length,
-            valid: true
-        };
-
-        if (!State.bestLap || completed.lapTime < State.bestLap.lapTime)
-            State.bestLap = completed;
-    }
-
-    function lapElapsed(sectorsState, sessionTime)
-    {
-        if (sectorsState.freeze && sessionTime < sectorsState.freezeUntil)
-            return number(sectorsState.freezeAccumulated);
-
-        const accumulated = number(sectorsState.accumulatedSectorTime);
-        const current = number(sectorsState.currentSectorTime);
-        return accumulated === null || current === null
-            ? null : accumulated + current;
-    }
-
-    function snapshot()
-    {
+    function snapshot() {
+        const frozen = State.frozenUntil > 0;
         return {
             sector: State.sector,
-            bestLap: {
-                sector: State.bestSectorDelta,
-                cumulative: State.bestCumulativeDelta
-            },
+            bestLap: { sector: State.bestSectorDelta, cumulative: State.bestCumulativeDelta },
             sessionFastest: { sector: null, cumulative: null },
             lastCompleted: State.lastCompleted,
             personalBestLapTime: State.bestLap ? State.bestLap.lapTime : null,
@@ -135,79 +74,136 @@
         };
     }
 
-    BS90.Delta.Update = function ()
-    {
+    function formatDelta(value) {
+        const n = number(value);
+        if (n === null) return "--.-";
+        const rounded = Math.abs(n) < 0.05 ? 0 : n;
+        return (rounded > 0 ? "+" : rounded < 0 ? "-" : "") +
+            Math.abs(rounded).toFixed(1);
+    }
+
+    function captureCompletedLap() {
+        const lapState = BS90.Lap && BS90.Lap.State;
+        if (!lapState || !lapState.current || !lapState.previous) return false;
+        const currentNumber = number(lapState.current.number);
+        if (currentNumber === null) return false;
+        if (State.seenLapNumber === null) {
+            State.seenLapNumber = currentNumber;
+            return false;
+        }
+        if (currentNumber === State.seenLapNumber) return false;
+
+        State.seenLapNumber = currentNumber;
+        const completed = cloneLap(lapState.previous);
+        const oldBest = State.bestLap;
+        const isValid = validLap(completed);
+
+        State.lastCompleted = {
+            lapTime: completed.lapTime || null,
+            sectors: completed.sectors.length,
+            valid: isValid
+        };
+
+        if (isValid && oldBest) {
+            State.sector = completed.sectors.length;
+            State.bestSectorDelta = completed.lapTime - oldBest.lapTime;
+            State.bestCumulativeDelta = completed.lapTime - oldBest.lapTime;
+            State.frozenSector = State.bestSectorDelta;
+            State.frozenCumulative = State.bestCumulativeDelta;
+        }
+
+        if (isValid && (!State.bestLap || completed.lapTime < State.bestLap.lapTime))
+            State.bestLap = completed;
+
+        return true;
+    }
+
+    BS90.Delta.Update = function () {
         if (!BS90.Sectors || typeof BS90.Sectors.Update !== "function" ||
-            !BS90.Lap || !BS90.Lap.State)
-        {
+            !BS90.Lap || !BS90.Lap.State) {
             State.status = "BS90.Sectors or BS90.Lap unavailable";
             return snapshot();
         }
 
         BS90.Sectors.Update();
-        captureCompletedLap();
-
-        const sectorsState = BS90.Sectors.State;
-        const sessionTime = number(read(
-            "DataCorePlugin.GameRawData.Telemetry.SessionTime"
-        ));
-
-        if (!sectorsState || sessionTime === null || !sectorsState.initialized)
-        {
+        const s = BS90.Sectors.State;
+        const sessionTime = number(read("DataCorePlugin.GameRawData.Telemetry.SessionTime"));
+        if (!s || sessionTime === null || !s.initialized) {
             State.status = "Waiting for telemetry";
             return snapshot();
         }
 
-        const elapsed = lapElapsed(sectorsState, sessionTime);
-        const isFrozenFinish = sectorsState.freeze &&
-            sessionTime < sectorsState.freezeUntil;
-        let sectorNumber = number(sectorsState.currentSector);
-        const currentSectorTime = number(sectorsState.currentSectorTime);
-
-        // The sector tracker resets to sector 1 at the finish line. While
-        // displaying the frozen completed lap, keep the display on its final sector.
-        if (isFrozenFinish && State.bestLap)
-            sectorNumber = State.bestLap.sectors.length;
-
-        State.sector = sectorNumber;
-
-        if (elapsed === null || sectorNumber === null || currentSectorTime === null)
-        {
-            State.status = "Invalid sector timing";
-            return snapshot();
+        const wasLapNumber = State.seenLapNumber;
+        const completedLap = captureCompletedLap();
+        if (completedLap) {
+            State.seenSectorCount = 0;
+            State.frozenUntil = sessionTime + FINISH_FREEZE_SECONDS;
         }
 
-        if (!State.bestLap)
-        {
+        if (State.frozenUntil > sessionTime) {
+            State.bestSectorDelta = State.frozenSector;
+            State.bestCumulativeDelta = State.frozenCumulative;
+            State.status = "Frozen split delta";
+            return snapshot();
+        }
+        State.frozenUntil = 0;
+
+        const current = BS90.Lap.State.current;
+        const sectors = current && Array.isArray(current.sectors) ? current.sectors : [];
+        const count = sectors.length;
+
+        // A completed sector has just been appended by BS90.Sectors.
+        if (!completedLap && State.initialized && count > State.seenSectorCount && State.bestLap) {
+            const completedSector = sectors[count - 1];
+            const reference = State.bestLap.sectors[count - 1];
+            if (completedSector && reference) {
+                State.sector = completedSector.sector;
+                State.bestSectorDelta = count === State.bestLap.sectors.length
+                    ? number(completedSector.accumulated) - State.bestLap.lapTime
+                    : number(completedSector.time) - number(reference.time);
+                State.bestCumulativeDelta =
+                    number(completedSector.accumulated) - number(reference.accumulated);
+                State.frozenSector = State.bestSectorDelta;
+                State.frozenCumulative = State.bestCumulativeDelta;
+                State.frozenUntil = sessionTime + SPLIT_FREEZE_SECONDS;
+                State.seenSectorCount = count;
+                State.status = "Frozen split delta";
+                return snapshot();
+            }
+        }
+
+        State.seenSectorCount = count;
+        State.sector = number(s.currentSector);
+
+        if (!State.bestLap) {
             State.bestSectorDelta = null;
             State.bestCumulativeDelta = null;
             State.status = "Waiting for first valid completed lap";
+            State.initialized = true;
             return snapshot();
         }
 
-        const reference = State.bestLap.sectors[sectorNumber - 1];
-        if (!reference)
-        {
-            State.bestSectorDelta = null;
-            State.bestCumulativeDelta = null;
-            State.status = "Sector count differs from personal best";
-            return snapshot();
-        }
-
-        // In the final sector, the sector delta intentionally shows whole-lap gap.
-        State.bestSectorDelta = sectorNumber === State.bestLap.sectors.length
-            ? elapsed - State.bestLap.lapTime
-            : currentSectorTime - reference.time;
-        State.bestCumulativeDelta = elapsed - reference.accumulated;
-        State.status = "OK (personal best); session fastest unavailable";
+        // Between splits, retain the last completed-sector delta rather than
+        // continuously changing the displayed result.
+        State.status = "Ready; waiting for next sector split";
+        State.initialized = true;
         return snapshot();
     };
 
     BS90.Delta.Get = function () { return snapshot(); };
     BS90.Delta.Status = function () { return BS90.Delta.Update().status; };
+    BS90.Delta.Format = formatDelta;
     BS90.Delta.SectorToBestLap = function () { return BS90.Delta.Update().bestLap.sector; };
     BS90.Delta.CumulativeToBestLap = function () { return BS90.Delta.Update().bestLap.cumulative; };
+    BS90.Delta.SectorToBestLapFormatted = function () {
+        return formatDelta(BS90.Delta.Update().bestLap.sector);
+    };
+    BS90.Delta.CumulativeToBestLapFormatted = function () {
+        return formatDelta(BS90.Delta.Update().bestLap.cumulative);
+    };
     BS90.Delta.SectorToFastestLap = function () { BS90.Delta.Update(); return null; };
     BS90.Delta.CumulativeToFastestLap = function () { BS90.Delta.Update(); return null; };
+    BS90.Delta.SectorToFastestLapFormatted = function () { BS90.Delta.Update(); return "--.-"; };
+    BS90.Delta.CumulativeToFastestLapFormatted = function () { BS90.Delta.Update(); return "--.-"; };
 
 })(globalThis);

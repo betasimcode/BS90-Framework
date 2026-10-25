@@ -18,7 +18,6 @@ All notable changes to this project will be documented in this file.
 ### Sector System
 
 - Current sector detection.
-- Current sector timer.
 - Last sector storage.
 - Accumulated sector time.
 - Finish line freeze.
@@ -41,19 +40,15 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## Upcoming
+## Unreleased — Sector Deltas
 
-### Relative
+### Added
 
-- Track mode.
-- Class mode.
-- Time Gap support.
+- Initial `BS90.Delta` module on `feature/sector-deltas`.
+- Public accessors for sector delta and cumulative delta against `bestLap` and `FastestLap`.
+- Explicit `null` values where reference sector timing isn't available.
 
-### Services
+### Notes
 
-- Fuel calculations.
-- Pit strategy.
-
-### UI
-
-- Dashboard integration.
+- Sector-time reference property names must be validated in SimHub against the active iRacing data provider before relying on live values.
+- Positive delta means slower than reference; negative delta means faster.

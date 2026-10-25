@@ -159,8 +159,16 @@
         }
 
         const elapsed = lapElapsed(sectorsState, sessionTime);
-        const sectorNumber = number(sectorsState.currentSector);
+        const isFrozenFinish = sectorsState.freeze &&
+            sessionTime < sectorsState.freezeUntil;
+        let sectorNumber = number(sectorsState.currentSector);
         const currentSectorTime = number(sectorsState.currentSectorTime);
+
+        // The sector tracker resets to sector 1 at the finish line. While
+        // displaying the frozen completed lap, keep the display on its final sector.
+        if (isFrozenFinish && State.bestLap)
+            sectorNumber = State.bestLap.sectors.length;
+
         State.sector = sectorNumber;
 
         if (elapsed === null || sectorNumber === null || currentSectorTime === null)

@@ -94,9 +94,9 @@
 
     function referenceSector(kind, sectorNumber)
     {
-        // Confirmed properties from the SimHub 9.13.3 catalog:
-        // SectorNBestLapTime = sector split from the best lap.
-        // SectorNBestTime    = best individual time for that sector.
+        // SimHub properties:
+        // SectorNBestLapTime = split from the best lap.
+        // SectorNBestTime    = best individual sector time.
         const suffix = String(sectorNumber);
         const path = kind === "bestLap"
             ? "DataCorePlugin.GameData.Sector" + suffix + "BestLapTime"
@@ -174,11 +174,8 @@
             State.initialized = true;
             State.identity = identity;
             resetLap(sessionTime, lapNumber, sectorNumber);
-            State.status = "Initialized; waiting for sector transition";
-            return snapshot();
         }
-
-        if (
+        else if (
             lapNumber !== null &&
             State.lapNumber !== null &&
             lapNumber !== State.lapNumber
@@ -186,20 +183,32 @@
         {
             State.lastCompleted = snapshot();
             resetLap(sessionTime, lapNumber, sectorNumber);
-            State.status = "New lap; waiting for sector transition";
-            return snapshot();
         }
-
-        if (sectorNumber !== State.sectorNumber)
+        else if (sectorNumber !== State.sectorNumber)
         {
             State.sectorNumber = sectorNumber;
             State.sectorStartSessionTime = sessionTime;
         }
 
-        const sectorElapsed = sessionTime - State.sectorStartSessionTime;
+        // Prefer SimHub's sector timer, which can provide a value immediately.
+        // Fall back to measuring elapsed session time after sector transitions.
+        const sectorTimer = seconds(read(
+            "DataCorePlugin.GameData.Sector" + sectorNumber + "Time"
+        ));
+        const measuredSectorElapsed = State.sectorStartSessionTime === null
+            ? null
+            : sessionTime - State.sectorStartSessionTime;
+        const sectorElapsed = sectorTimer !== null && sectorTimer >= 0
+            ? sectorTimer
+            : measuredSectorElapsed;
         const lapElapsed = currentLapTime;
 
-        if (sectorElapsed < 0 || lapElapsed === null || lapElapsed < 0)
+        if (
+            sectorElapsed === null ||
+            sectorElapsed < 0 ||
+            lapElapsed === null ||
+            lapElapsed < 0
+        )
         {
             State.status = "Invalid elapsed time";
             return snapshot();
@@ -236,6 +245,12 @@
     BS90.Delta.Get = function ()
     {
         return snapshot();
+    };
+
+    BS90.Delta.Status = function ()
+    {
+        BS90.Delta.Update();
+        return State.status;
     };
 
     BS90.Delta.SectorToBestLap = function ()

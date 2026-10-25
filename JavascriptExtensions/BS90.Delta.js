@@ -1,6 +1,7 @@
 //----------------------------------------------------------
 // BS90.Delta
-// Sector and cumulative deltas against lap references.
+// Session-best and personal-best sector deltas.
+// The active provider must expose reference sector times.
 // Units: seconds.
 //----------------------------------------------------------
 
@@ -20,16 +21,13 @@
         completedLaps: null,
         sectorNumber: null,
         sectorStartSessionTime: null,
-        currentLapStartedAt: null,
-        lastSectorStartPct: null,
+        lapStartSessionTime: null,
         lastCompleted: null,
-        sectorDeltaBestLap: null,
-        sectorDeltaFastestLap: null,
-        cumulativeDeltaBestLap: null,
-        cumulativeDeltaFastestLap: null
+        bestLap: { sector: null, cumulative: null },
+        FastestLap: { sector: null, cumulative: null }
     };
 
-    function number(value)
+    function finiteNumber(value)
     {
         if (value === null || value === undefined || value === "")
             return null;
@@ -38,129 +36,130 @@
         return Number.isFinite(parsed) ? parsed : null;
     }
 
-    function positive(value)
+    function positiveNumber(value)
     {
-        const parsed = number(value);
+        const parsed = finiteNumber(value);
         return parsed !== null && parsed > 0 ? parsed : null;
     }
 
     function read(path)
     {
-        return number($prop(path));
+        return $prop(path);
     }
 
-    function readSectorNumber()
+    function currentSectorNumber()
     {
         if (!BS90.Data || typeof BS90.Data.CurrentSectorIndex !== "function")
             return null;
 
-        const index = number(BS90.Data.CurrentSectorIndex());
+        const index = finiteNumber(BS90.Data.CurrentSectorIndex());
         return index !== null && index >= 0 ? Math.floor(index) + 1 : null;
     }
 
-    function readSectorReference(kind, sectorNumber)
+    function sectorReference(kind, sectorNumber)
     {
-        // SimHub/iRacing exposes lap-level timing references natively.
-        // This function intentionally only reads genuine sector-time
-        // properties; sector positions (SectorStartPct) are not times.
-        const index = String(sectorNumber).padStart(2, "0");
-        const root =
+        // These candidate names are deliberately isolated here: they must
+        // be matched to the exact properties provided by the active SimHub
+        // data plugin. Never treat SectorStartPct as a reference time.
+        const padded = String(sectorNumber).padStart(2, "0");
+        const sectorRoot =
             "DataCorePlugin.GameRawData.SessionData.SplitTimeInfo.Sectors" +
-            index;
+            padded;
 
         const paths = kind === "bestLap"
             ? [
-                root + ".BestSectorTime",
-                "DataCorePlugin.GameRawData.Telemetry.PlayerBestSectorTime" + sectorNumber,
-                "IRacingExtraProperties.SpectatedCar_BestSectorTime" + sectorNumber
+                sectorRoot + ".BestSectorTime",
+                "IRacingExtraProperties.SpectatedCar_BestSectorTime" + sectorNumber,
+                "DataCorePlugin.GameRawData.Telemetry.PlayerBestSectorTime" + sectorNumber
             ]
             : [
-                root + ".FastestSectorTime",
-                "DataCorePlugin.GameRawData.Telemetry.FastestSectorTime" + sectorNumber,
-                "IRacingExtraProperties.SpectatedCar_FastestSectorTime" + sectorNumber
+                sectorRoot + ".FastestSectorTime",
+                "IRacingExtraProperties.SpectatedCar_FastestSectorTime" + sectorNumber,
+                "DataCorePlugin.GameRawData.Telemetry.FastestSectorTime" + sectorNumber
             ];
 
         for (let i = 0; i < paths.length; i++)
         {
-            const result = positive($prop(paths[i]));
-            if (result !== null)
-                return result;
+            const value = positiveNumber(read(paths[i]));
+            if (value !== null)
+                return value;
         }
 
         return null;
     }
 
-    function readReferenceSectors(kind, sectorNumber)
+    function referenceSectors(kind, sectorNumber)
     {
-        const sectors = [];
+        const values = [];
+
         for (let i = 1; i <= sectorNumber; i++)
         {
-            const time = readSectorReference(kind, i);
-            if (time === null)
+            const value = sectorReference(kind, i);
+            if (value === null)
                 return null;
 
-            sectors.push(time);
+            values.push(value);
         }
-        return sectors;
+
+        return values;
     }
 
-    function sum(values)
+    function total(values)
     {
-        return values.reduce((total, value) => total + value, 0);
+        return values.reduce((sum, value) => sum + value, 0);
     }
 
-    function resetForLap(sessionTime, completedLaps, sectorNumber)
-    {
-        State.completedLaps = completedLaps;
-        State.sectorNumber = sectorNumber;
-        State.sectorStartSessionTime = sessionTime;
-        State.currentLapStartedAt = sessionTime;
-        State.sectorDeltaBestLap = null;
-        State.sectorDeltaFastestLap = null;
-        State.cumulativeDeltaBestLap = null;
-        State.cumulativeDeltaFastestLap = null;
-    }
-
-    function result()
+    function snapshot()
     {
         return {
             sector: State.sectorNumber,
             bestLap: {
-                sector: State.sectorDeltaBestLap,
-                cumulative: State.cumulativeDeltaBestLap
+                sector: State.bestLap.sector,
+                cumulative: State.bestLap.cumulative
             },
             FastestLap: {
-                sector: State.sectorDeltaFastestLap,
-                cumulative: State.cumulativeDeltaFastestLap
+                sector: State.FastestLap.sector,
+                cumulative: State.FastestLap.cumulative
             },
             lastCompleted: State.lastCompleted
         };
     }
 
+    function resetLap(sessionTime, completedLaps, sectorNumber)
+    {
+        State.completedLaps = completedLaps;
+        State.sectorNumber = sectorNumber;
+        State.sectorStartSessionTime = sessionTime;
+        State.lapStartSessionTime = sessionTime;
+        State.bestLap = { sector: null, cumulative: null };
+        State.FastestLap = { sector: null, cumulative: null };
+    }
+
     BS90.Delta.Update = function ()
     {
-        const sessionTime = read(
+        const sessionTime = finiteNumber(read(
             "DataCorePlugin.GameRawData.Telemetry.SessionTime"
-        );
-        const currentLapTime = read("DataCorePlugin.GameData.CurrentLapTime");
-        const completedLaps = read("DataCorePlugin.GameData.CompletedLaps");
+        ));
+        const lapTime = finiteNumber(read(
+            "DataCorePlugin.GameData.CurrentLapTime"
+        ));
+        const completedLaps = finiteNumber(read(
+            "DataCorePlugin.GameData.CompletedLaps"
+        ));
         const identity = String(
-            $prop("IRacingExtraProperties.SpectatedCar_Name") ?? ""
+            read("IRacingExtraProperties.SpectatedCar_Name") ?? ""
         );
-        const sectorNumber = readSectorNumber();
+        const sectorNumber = currentSectorNumber();
 
-        if (
-            sessionTime === null ||
-            sectorNumber === null
-        )
-            return result();
+        if (sessionTime === null || sectorNumber === null)
+            return snapshot();
 
         if (!State.initialized || identity !== State.identity)
         {
             State.initialized = true;
             State.identity = identity;
-            resetForLap(sessionTime, completedLaps, sectorNumber);
-            return result();
+            resetLap(sessionTime, completedLaps, sectorNumber);
+            return snapshot();
         }
 
         if (
@@ -169,64 +168,52 @@
             completedLaps !== State.completedLaps
         )
         {
-            State.lastCompleted = result();
-            resetForLap(sessionTime, completedLaps, sectorNumber);
-            return result();
+            State.lastCompleted = snapshot();
+            resetLap(sessionTime, completedLaps, sectorNumber);
+            return snapshot();
         }
 
         if (sectorNumber !== State.sectorNumber)
         {
             State.sectorNumber = sectorNumber;
             State.sectorStartSessionTime = sessionTime;
-            State.sectorDeltaBestLap = null;
-            State.sectorDeltaFastestLap = null;
+            State.bestLap.sector = null;
+            State.FastestLap.sector = null;
         }
 
-        const sectorElapsed = State.sectorStartSessionTime === null
+        const sectorElapsed = sessionTime - State.sectorStartSessionTime;
+        const lapElapsed = lapTime !== null && lapTime >= 0
+            ? lapTime
+            : sessionTime - State.lapStartSessionTime;
+
+        if (sectorElapsed < 0 || lapElapsed < 0)
+            return snapshot();
+
+        const bestReference = sectorReference("bestLap", sectorNumber);
+        const fastestReference = sectorReference("FastestLap", sectorNumber);
+        const bestSectors = referenceSectors("bestLap", sectorNumber);
+        const fastestSectors = referenceSectors("FastestLap", sectorNumber);
+
+        State.bestLap.sector = bestReference === null
             ? null
-            : sessionTime - State.sectorStartSessionTime;
+            : sectorElapsed - bestReference;
+        State.FastestLap.sector = fastestReference === null
+            ? null
+            : sectorElapsed - fastestReference;
 
-        const currentElapsed = currentLapTime !== null && currentLapTime >= 0
-            ? currentLapTime
-            : (
-                State.currentLapStartedAt === null
-                    ? null
-                    : sessionTime - State.currentLapStartedAt
-            );
+        State.bestLap.cumulative = bestSectors === null
+            ? null
+            : lapElapsed - total(bestSectors);
+        State.FastestLap.cumulative = fastestSectors === null
+            ? null
+            : lapElapsed - total(fastestSectors);
 
-        const bestSectors = readReferenceSectors("bestLap", sectorNumber);
-        const fastestSectors = readReferenceSectors("FastestLap", sectorNumber);
-
-        if (sectorElapsed !== null && sectorElapsed >= 0)
-        {
-            const bestCurrentSector = readSectorReference("bestLap", sectorNumber);
-            const fastestCurrentSector = readSectorReference("FastestLap", sectorNumber);
-
-            State.sectorDeltaBestLap = bestCurrentSector === null
-                ? null
-                : sectorElapsed - bestCurrentSector;
-
-            State.sectorDeltaFastestLap = fastestCurrentSector === null
-                ? null
-                : sectorElapsed - fastestCurrentSector;
-
-            State.cumulativeDeltaBestLap =
-                bestSectors === null || currentElapsed === null
-                    ? null
-                    : currentElapsed - sum(bestSectors);
-
-            State.cumulativeDeltaFastestLap =
-                fastestSectors === null || currentElapsed === null
-                    ? null
-                    : currentElapsed - sum(fastestSectors);
-        }
-
-        return result();
+        return snapshot();
     };
 
     BS90.Delta.Get = function ()
     {
-        return result();
+        return snapshot();
     };
 
     BS90.Delta.SectorToBestLap = function ()

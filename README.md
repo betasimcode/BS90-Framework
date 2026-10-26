@@ -79,6 +79,12 @@ BS90.Time.Gap1(-0.46)     // "-0.5"
 - Split result frozen for 3 seconds; finish result frozen for 8 seconds
 - Signed format: positive means slower, negative means faster
 - Color helpers for neutral, slower, faster and personal-best lap results
+- Color decisions are centralized in BS90.Delta; widgets only apply the returned color
+- `BS90.Delta.SectorColor()` and `BS90.Delta.CumulativeColor()` return ARGB colors for their respective values
+- `BS90.Delta.ColorForDelta(value)` returns a color for any numeric delta, or the unavailable color for missing values
+- `BS90.Delta.ColorPalette()` returns a copy of the active palette: `neutral`, `slower`, `faster`, `fastest`, and `unavailable`
+- Default palette: neutral `#FF444444`, slower `#FFFFB52E`, faster `#FF00FF02`, personal-best lap `#FFC500CE`, unavailable `#FF777777`
+- Neutral threshold is 0.05 seconds; it is independent of the one-decimal display formatter
 - Session-fastest comparison is intentionally unavailable until a real completed-lap reference is implemented
 
 Example:

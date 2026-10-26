@@ -90,8 +90,10 @@ BS90.Time.Gap1 = function(value)
     if (!Number.isFinite(number))
         return "";
 
-    const rounded = Math.abs(number) < 0.0000001 ? 0 : number;
-    return (rounded >= 0 ? "+" : "") + rounded.toFixed(1);
+    // Truncar a una décima en lugar de redondear.
+    // Ej.: 4.99 -> +4.9, -4.99 -> -4.9.
+    const truncated = Math.trunc(number * 10) / 10;
+    return (truncated >= 0 ? "+" : "") + truncated.toFixed(1);
 };
 
 

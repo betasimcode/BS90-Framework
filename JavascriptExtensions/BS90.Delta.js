@@ -381,38 +381,48 @@
 
     // Pure snapshot read; it never advances the timing state.
     BS90.Delta.Get = function () { return snapshot(); };
-    BS90.Delta.Status = function () { return State.status; };
+    BS90.Delta.Status = function ()
+    {
+        BS90.Delta.Update();
+        return State.status;
+    };
     BS90.Delta.Format = formatDelta;
 
-    // Legacy-compatible values. These getters deliberately do not call Update:
-    // the dashboard should invoke BS90.Delta.Update() once per telemetry tick.
+    // The public value getters refresh the engine. Repeated calls are safe:
+    // both Sectors and Delta deduplicate processing by telemetry SessionTime.
     BS90.Delta.SectorToBestLap = function ()
     {
+        BS90.Delta.Update();
         return State.sectorDelta;
     };
 
     BS90.Delta.CumulativeToBestLap = function ()
     {
+        BS90.Delta.Update();
         return State.cumulativeDelta;
     };
 
     BS90.Delta.SectorToBestLapFormatted = function ()
     {
+        BS90.Delta.Update();
         return formatDelta(State.sectorDelta);
     };
 
     BS90.Delta.CumulativeToBestLapFormatted = function ()
     {
+        BS90.Delta.Update();
         return formatDelta(State.cumulativeDelta);
     };
 
     BS90.Delta.SectorColor = function ()
     {
+        BS90.Delta.Update();
         return deltaColor(State.sectorDelta);
     };
 
     BS90.Delta.CumulativeColor = function ()
     {
+        BS90.Delta.Update();
         return deltaColor(State.cumulativeDelta);
     };
 

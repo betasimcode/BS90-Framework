@@ -242,8 +242,15 @@
         }
 
         // Comparar primero con la referencia anterior y actualizarla después.
-        if (!State.bestLap || completed.lapTime < State.bestLap.lapTime)
+        const personalBest = !State.bestLap ||
+            completed.lapTime < State.bestLap.lapTime;
+
+        if (personalBest)
+        {
             State.bestLap = completed;
+            if (previousBest)
+                State.displayState = "personal-best-lap";
+        }
 
         return true;
     }
@@ -417,13 +424,17 @@
     BS90.Delta.SectorColor = function ()
     {
         BS90.Delta.Update();
-        return deltaColor(State.sectorDelta);
+        return State.displayState === "personal-best-lap"
+            ? CONFIG.colors.fastest
+            : deltaColor(State.sectorDelta);
     };
 
     BS90.Delta.CumulativeColor = function ()
     {
         BS90.Delta.Update();
-        return deltaColor(State.cumulativeDelta);
+        return State.displayState === "personal-best-lap"
+            ? CONFIG.colors.fastest
+            : deltaColor(State.cumulativeDelta);
     };
 
     BS90.Delta.ColorForDelta = deltaColor;

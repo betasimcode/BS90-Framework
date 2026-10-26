@@ -44,6 +44,57 @@ BS90.Time.Format = function(seconds)
     );
 };
 
+//----------------------------------------------------------
+// Formatos adicionales: conservan Format() sin cambios
+//----------------------------------------------------------
+
+// Tiempo de sector con dos decimales.
+// Ejemplo: 32.47 / 01:32.47
+BS90.Time.Format2 = function(seconds)
+{
+    if (seconds == null || !isFinite(Number(seconds)) || Number(seconds) < 0)
+        return "--.--";
+
+    const totalCentiseconds = Math.floor(Number(seconds) * 100);
+    const minutes = Math.floor(totalCentiseconds / 6000);
+    const secs = Math.floor((totalCentiseconds % 6000) / 100);
+    const centiseconds = totalCentiseconds % 100;
+
+    if (minutes > 0)
+    {
+        return (
+            String(minutes).padStart(2, "0") +
+            ":" +
+            String(secs).padStart(2, "0") +
+            "." +
+            String(centiseconds).padStart(2, "0")
+        );
+    }
+
+    return (
+        String(secs).padStart(2, "0") +
+        "." +
+        String(centiseconds).padStart(2, "0")
+    );
+};
+
+// Gap con un decimal.
+// Acepta segundos numéricos o un delta textual como "+0.4" / "-0.4".
+BS90.Time.Gap1 = function(value)
+{
+    if (value == null || value === "")
+        return "";
+
+    const number = Number(value);
+
+    if (!Number.isFinite(number))
+        return "";
+
+    const rounded = Math.abs(number) < 0.0000001 ? 0 : number;
+    return (rounded >= 0 ? "+" : "") + rounded.toFixed(1);
+};
+
+
 //--------------------------------------------------
 // Formato compacto Broadcast
 //--------------------------------------------------

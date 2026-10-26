@@ -139,9 +139,11 @@
         const n = toNumber(value);
         if (n === null) return "--.-";
 
-        const rounded = Math.abs(n) < CONFIG.neutralThreshold ? 0 : n;
-        const sign = rounded > 0 ? "+" : rounded < 0 ? "-" : "";
-        return sign + Math.abs(rounded).toFixed(1);
+        // Truncar a una décima; no redondear la presentación.
+        // Ej.: 4.99 -> +4.9, -4.99 -> -4.9.
+        const truncated = Math.trunc(n * 10) / 10;
+        const sign = truncated > 0 ? "+" : truncated < 0 ? "-" : "";
+        return sign + Math.abs(truncated).toFixed(1);
     }
 
     function deltaColor(value)

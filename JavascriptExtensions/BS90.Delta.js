@@ -441,6 +441,18 @@
 
     BS90.Delta.ColorForDelta = deltaColor;
 
+    // Public palette snapshot: inspect colors without exposing mutable config.
+    BS90.Delta.ColorPalette = function ()
+    {
+        return {
+            neutral: CONFIG.colors.neutral,
+            slower: CONFIG.colors.slower,
+            faster: CONFIG.colors.faster,
+            fastest: CONFIG.colors.fastest,
+            unavailable: CONFIG.colors.unavailable
+        };
+    };
+
     BS90.Delta.SectorToFastestLap = function () { return null; };
     BS90.Delta.CumulativeToFastestLap = function () { return null; };
     BS90.Delta.SectorToFastestLapFormatted = function () { return "--.-"; };

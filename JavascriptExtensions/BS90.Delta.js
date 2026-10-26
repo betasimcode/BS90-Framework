@@ -359,6 +359,12 @@
 
         State.frozenUntil = 0;
 
+        // El resultado congelado es temporal: al vencer el intervalo,
+        // limpiar los valores visibles hasta completar el siguiente sector.
+        State.sectorDelta = null;
+        State.cumulativeDelta = null;
+        State.sectorNumber = null;
+
         if (!State.bestLap)
         {
             State.displayState = "waiting";

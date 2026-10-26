@@ -58,6 +58,20 @@ Current development is focused on iRacing.
 - Gap to best lap
 - Automatic 5-second freeze after crossing finish line
 
+### Time formatting
+
+Existing formatters are preserved. Additional formatters are available for dashboards that need different precision:
+
+```javascript
+BS90.Time.Format2(32.476) // "32.47"
+BS90.Time.Gap1(0.46)      // "+0.5"
+BS90.Time.Gap1(-0.46)     // "-0.5"
+```
+
+- `BS90.Time.Format()`: existing three-decimal formatter, unchanged
+- `BS90.Time.Format2()`: two decimals for sector/lap time
+- `BS90.Time.Gap1()`: signed gap with one decimal
+
 ### Delta
 
 - Sector delta against the driver's best completed lap

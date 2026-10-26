@@ -273,7 +273,6 @@
         // antiguos en eventos nuevos. Se procesa sólo el último sector
         // que haya aparecido desde el último refresco.
         const completed = sectors[count - 1];
-        State.seenSectorCount = count;
 
         if (!completed)
             return false;
@@ -283,6 +282,9 @@
 
         if (!State.bestLap || index < 0 || !State.bestLap.sectors[index])
         {
+            // No hay una referencia comparable. Consumimos este evento para
+            // no volver a tratar el mismo sector en cada tick.
+            State.seenSectorCount = count;
             State.sectorNumber = sectorNumber;
             State.sectorDelta = null;
             State.cumulativeDelta = null;
@@ -298,9 +300,25 @@
         const referenceTime = toNumber(reference.time);
         const referenceAccumulated = toNumber(reference.accumulated);
 
-        if (sectorTime === null || accumulated === null ||
-            referenceTime === null || referenceAccumulated === null)
-            return false;
+        if (sectorTime === null || !(sectorTime > 0) ||
+            accumulated === null || !(accumulated > 0) ||
+            referenceTime === null || !(referenceTime > 0) ||
+            referenceAccumulated === null || !(referenceAccumulated > 0))
+        {
+            // No consumir el sector: los datos de telemetría pueden llegar
+            // en ticks distintos. Reintentar en el siguiente tick y borrar
+            // el delta anterior para no mostrar un resultado obsoleto.
+            State.sectorNumber = sectorNumber;
+            State.sectorDelta = null;
+            State.cumulativeDelta = null;
+            State.displayState = "unavailable";
+            State.status = "Sector data unavailable; retrying";
+            State.frozenUntil = 0;
+            return true;
+        }
+
+        // Consumir el sector sólo después de validar todos los datos.
+        State.seenSectorCount = count;
 
         State.sectorNumber = sectorNumber;
         State.sectorDelta = sectorTime - referenceTime;

@@ -34,6 +34,8 @@ BS90.Sectors.State = {
     newLap: false,
     
 	splitCrossed: false,
+
+    lastProcessedSessionTime: null,
 	
 	freeze: false,
 

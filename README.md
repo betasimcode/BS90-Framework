@@ -27,6 +27,7 @@ Current development is focused on iRacing.
 - BS90.Time
 - BS90.Lap
 - BS90.Sectors
+- BS90.Delta
 - BS90.Relative
 
 ### Services
@@ -56,6 +57,26 @@ Current development is focused on iRacing.
 - Current lap timer
 - Gap to best lap
 - Automatic 5-second freeze after crossing finish line
+
+### Delta
+
+- Sector delta against the driver's best completed lap
+- Cumulative delta using only sectors completed in the current lap
+- Split result frozen for 3 seconds; finish result frozen for 8 seconds
+- Signed format: positive means slower, negative means faster
+- Color helpers for neutral, slower, faster and personal-best lap results
+- Session-fastest comparison is intentionally unavailable until a real completed-lap reference is implemented
+
+Example:
+
+```javascript
+BS90.Delta.SectorToBestLapFormatted()
+BS90.Delta.CumulativeToBestLapFormatted()
+BS90.Delta.SectorColor()
+BS90.Delta.CumulativeColor()
+```
+
+Delta values are updated from telemetry when a public getter is called. Repeated calls in the same telemetry tick are deduplicated.
 
 ### Relative (Work in Progress)
 

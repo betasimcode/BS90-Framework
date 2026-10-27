@@ -34,6 +34,8 @@ BS90.Sectors.State = {
     newLap: false,
     
 	splitCrossed: false,
+
+    lastProcessedSessionTime: null,
 	
 	freeze: false,
 
@@ -119,7 +121,24 @@ BS90.Sectors.Update = function ()
 		Number($prop("DataCorePlugin.GameRawData.Telemetry.SessionTime"));
 
     //------------------------------------------------------
-    // Reset de eventos
+    // Idempotencia por tick de telemetría
+    //
+    // SimHub puede invocar varios getters en el mismo frame.
+    // Un tick sólo debe avanzar el estado una vez.
+    //------------------------------------------------------
+
+    if (
+        Number.isFinite(sessionTime) &&
+        BS90.Sectors.State.lastProcessedSessionTime === sessionTime
+    )
+    {
+        return;
+    }
+
+    BS90.Sectors.State.lastProcessedSessionTime = sessionTime;
+
+    //------------------------------------------------------
+    // Reset de eventos: sólo una vez por tick
     //------------------------------------------------------
 
     BS90.Sectors.State.newLap = false;
@@ -135,6 +154,8 @@ BS90.Sectors.Update = function ()
 
         BS90.Sectors.State.lastCurrentLapTime = currentLapTime;
         BS90.Sectors.State.lastLapDistPct = lapDistPct;
+        BS90.Sectors.State.sectorStartSessionTime =
+            Number.isFinite(sessionTime) ? sessionTime : 0;
 
         return;
     }
@@ -164,7 +185,16 @@ BS90.Sectors.Update = function ()
 		BS90.Sectors.State.accumulatedSectorTime +=
 			BS90.Sectors.State.currentSectorTime;
 			
-		BS90.Lap.EndLap();
+		
+
+        // Register the final sector before closing the lap.
+        BS90.Lap.AddSector({
+            sector: BS90.Sectors.State.currentSector,
+            time: BS90.Sectors.State.lastSectorTime,
+            accumulated: BS90.Sectors.State.accumulatedSectorTime
+        });
+
+        BS90.Lap.EndLap();
 		
 		BS90.Sectors.History.sectors = [];
 		

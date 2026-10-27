@@ -27,6 +27,7 @@ Current development is focused on iRacing.
 - BS90.Time
 - BS90.Lap
 - BS90.Sectors
+- BS90.Delta
 - BS90.Relative
 
 ### Services
@@ -56,6 +57,46 @@ Current development is focused on iRacing.
 - Current lap timer
 - Gap to best lap
 - Automatic 5-second freeze after crossing finish line
+
+### Time formatting
+
+Existing formatters are preserved. Additional formatters are available for dashboards that need different precision:
+
+```javascript
+BS90.Time.Format2(32.476) // "32.47"
+BS90.Time.Gap1(0.46)      // "+0.5"
+BS90.Time.Gap1(-0.46)     // "-0.5"
+```
+
+- `BS90.Time.Format()`: existing three-decimal formatter, unchanged
+- `BS90.Time.Format2()`: two decimals for sector/lap time
+- `BS90.Time.Gap1()`: signed gap with one decimal
+
+### Delta
+
+- Sector delta against the driver's best completed lap
+- Cumulative delta using only sectors completed in the current lap
+- Split result frozen for 3 seconds; finish result frozen for 8 seconds
+- Signed format: positive means slower, negative means faster
+- Color helpers for neutral, slower, faster and personal-best lap results
+- Color decisions are centralized in BS90.Delta; widgets only apply the returned color
+- `BS90.Delta.SectorColor()` and `BS90.Delta.CumulativeColor()` return ARGB colors for their respective values
+- `BS90.Delta.ColorForDelta(value)` returns a color for any numeric delta, or the unavailable color for missing values
+- `BS90.Delta.ColorPalette()` returns a copy of the active palette: `neutral`, `slower`, `faster`, `fastest`, and `unavailable`
+- Default palette: neutral `#FF444444`, slower `#FFFFB52E`, faster `#FF00FF02`, personal-best lap `#FFC500CE`, unavailable `#FF777777`
+- Neutral threshold is 0.05 seconds; it is independent of the one-decimal display formatter
+- Session-fastest comparison is intentionally unavailable until a real completed-lap reference is implemented
+
+Example:
+
+```javascript
+BS90.Delta.SectorToBestLapFormatted()
+BS90.Delta.CumulativeToBestLapFormatted()
+BS90.Delta.SectorColor()
+BS90.Delta.CumulativeColor()
+```
+
+Delta values are updated from telemetry when a public getter is called. Repeated calls in the same telemetry tick are deduplicated.
 
 ### Relative (Work in Progress)
 

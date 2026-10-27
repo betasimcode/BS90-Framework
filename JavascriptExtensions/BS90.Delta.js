@@ -441,6 +441,36 @@
         return formatDelta(State.cumulativeDelta);
     };
 
+    // Tiempo del sector de referencia dentro de la mejor vuelta personal.
+    // sectorNumber usa numeración humana: 1, 2, 3...
+    BS90.Delta.BestLapSectorTime = function (sectorNumber)
+    {
+        BS90.Delta.Update();
+
+        const number = toNumber(sectorNumber);
+        if (number === null || number < 1 || !Number.isInteger(number) ||
+            !State.bestLap || !Array.isArray(State.bestLap.sectors))
+            return null;
+
+        const sector = State.bestLap.sectors[number - 1];
+        const time = sector ? toNumber(sector.time) : null;
+
+        return time !== null && time > 0 ? time : null;
+    };
+
+    // Versión lista para mostrar en un item de SimHub.
+    BS90.Delta.BestLapSectorTimeFormatted = function (sectorNumber)
+    {
+        const time = BS90.Delta.BestLapSectorTime(sectorNumber);
+
+        if (time === null)
+            return "--.--";
+
+        return BS90.Time && typeof BS90.Time.Format === "function"
+            ? BS90.Time.Format(time)
+            : time.toFixed(3);
+    };
+
     BS90.Delta.SectorColor = function ()
     {
         BS90.Delta.Update();

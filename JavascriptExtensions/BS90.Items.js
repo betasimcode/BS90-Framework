@@ -118,6 +118,39 @@
     BS90.Items.FastestTime3 = function () { return formatTime(readFastestClassLap(), 3); };
 
     //------------------------------------------------------
+    // Completed-lap deltas: last lap against references
+    //------------------------------------------------------
+
+    function lastLapDelta(referenceTime)
+    {
+        const last = seconds(lastTime());
+        const reference = seconds(referenceTime);
+
+        if (last === null || reference === null || last <= 0 || reference <= 0)
+            return null;
+
+        return last - reference;
+    }
+
+    function lastDeltaBest()
+    {
+        return lastLapDelta(bestTime());
+    }
+
+    function lastDeltaFastest()
+    {
+        return lastLapDelta(readFastestClassLap());
+    }
+
+    BS90.Items.LastDeltaBest1 = function () { return formatGap(lastDeltaBest(), 1); };
+    BS90.Items.LastDeltaBest2 = function () { return formatGap(lastDeltaBest(), 2); };
+    BS90.Items.LastDeltaBest3 = function () { return formatGap(lastDeltaBest(), 3); };
+
+    BS90.Items.LastDeltaFastest1 = function () { return formatGap(lastDeltaFastest(), 1); };
+    BS90.Items.LastDeltaFastest2 = function () { return formatGap(lastDeltaFastest(), 2); };
+    BS90.Items.LastDeltaFastest3 = function () { return formatGap(lastDeltaFastest(), 3); };
+
+    //------------------------------------------------------
     // Current sector number and running sector time
     //------------------------------------------------------
 

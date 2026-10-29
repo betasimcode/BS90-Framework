@@ -25,6 +25,7 @@ Current development is focused on iRacing.
 ### Core
 
 - BS90.Time
+- BS90.Items
 - BS90.Lap
 - BS90.Sectors
 - BS90.Delta
@@ -58,19 +59,33 @@ Current development is focused on iRacing.
 - Gap to best lap
 - Automatic 5-second freeze after crossing finish line
 
-### Time formatting
+### Timing items and precision
 
-Existing formatters are preserved. Additional formatters are available for dashboards that need different precision:
+`BS90.Items` exposes dashboard-ready timing values with a consistent naming convention. Suffixes `1`, `2`, and `3` select one, two, or three displayed decimals. Values are kept at full precision internally; formatting truncates rather than rounds.
 
 ```javascript
-BS90.Time.Format2(32.476) // "32.47"
-BS90.Time.Gap1(0.46)      // "+0.5"
-BS90.Time.Gap1(-0.46)     // "-0.5"
+BS90.Items.LastTime1()
+BS90.Items.BestTime2()
+BS90.Items.FastestTime3()
+BS90.Items.SectorActual()
+BS90.Items.SectorTime2()
+BS90.Items.SplitGapBest2()
+BS90.Items.DeltaBest3()
 ```
 
-- `BS90.Time.Format()`: existing three-decimal formatter, unchanged
-- `BS90.Time.Format2()`: two decimals for sector/lap time
-- `BS90.Time.Gap1()`: signed gap with one decimal
+Available items:
+
+- `LastTime1/2/3()`: last completed lap time
+- `BestTime1/2/3()`: personal best lap time
+- `FastestTime1/2/3()`: best lap time for the current iRacing class, read from `IRacingExtraProperties.iRacing_ClassLeaderboard_Driver_00_BestLapTime`
+- `SectorActual()`: current sector number
+- `SectorTime1/2/3()`: running time in the current sector
+- `SplitGapBest1/2/3()`: completed-sector gap against the personal best lap
+- `DeltaBest1/2/3()`: cumulative gap against the personal best lap
+
+Session-fastest sector gaps and deltas are intentionally deferred until suitable sector-reference data is identified.
+
+The existing `BS90.Time.Format()`, `Format2()`, `Gap()`, and `Gap1()` helpers remain available for backward compatibility.
 
 ### Delta
 

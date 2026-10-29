@@ -67,6 +67,8 @@ Current development is focused on iRacing.
 BS90.Items.LastTime1()
 BS90.Items.BestTime2()
 BS90.Items.FastestTime3()
+BS90.Items.LastDeltaBest2()
+BS90.Items.LastDeltaFastest2()
 BS90.Items.SectorActual()
 BS90.Items.SectorTime2()
 BS90.Items.SplitGapBest2()
@@ -78,6 +80,9 @@ Available items:
 - `LastTime1/2/3()`: last completed lap time
 - `BestTime1/2/3()`: personal best lap time
 - `FastestTime1/2/3()`: best lap time for the current iRacing class, read from `IRacingExtraProperties.iRacing_ClassLeaderboard_Driver_00_BestLapTime`
+- `LastDeltaBest1/2/3()`: last completed lap time minus the personal best lap time
+- `LastDeltaFastest1/2/3()`: last completed lap time minus the current class's fastest lap time
+- Lap deltas are blank when either time is unavailable or non-positive; positive means slower and negative means faster
 - `SectorActual()`: current sector number
 - `SectorTime1/2/3()`: running time in the current sector
 - `SplitGapBest1/2/3()`: completed-sector gap against the personal best lap
